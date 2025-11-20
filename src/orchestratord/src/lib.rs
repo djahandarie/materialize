@@ -7,6 +7,64 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::{fmt::Display, str::FromStr};
+
+use serde::Deserialize;
+
+use mz_cloud_resources::crd::MaterializeCertSpec;
+
 pub mod controller;
 pub mod k8s;
 pub mod metrics;
+pub mod tls;
+
+#[derive(Clone, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct DefaultCertificateSpecs {
+    balancerd_external: Option<MaterializeCertSpec>,
+    console_external: Option<MaterializeCertSpec>,
+    internal: Option<MaterializeCertSpec>,
+}
+
+impl FromStr for DefaultCertificateSpecs {
+    type Err = serde_json::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        serde_json::from_str(s)
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+    Anyhow(#[from] anyhow::Error),
+    Kube(#[from] kube::Error),
+    Reqwest(#[from] reqwest::Error),
+}
+
+impl Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Anyhow(e) => write!(f, "{e}"),
+            Self::Kube(e) => write!(f, "{e}"),
+            Self::Reqwest(e) => write!(f, "{e}"),
+        }
+    }
+}
+
+pub fn matching_image_from_environmentd_image_ref(
+    environmentd_image_ref: &str,
+    image_name: &str,
+    image_tag: Option<&str>,
+) -> String {
+    let namespace = environmentd_image_ref
+        .rsplit_once('/')
+        .unwrap_or(("materialize", ""))
+        .0;
+    let tag = image_tag.unwrap_or_else(|| {
+        environmentd_image_ref
+            .rsplit_once(':')
+            .unwrap_or(("", "unstable"))
+            .1
+    });
+    format!("{namespace}/{image_name}:{tag}")
+}

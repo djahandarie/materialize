@@ -7,15 +7,17 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use mz_cloud_resources::crd::generated::cert_manager::certificates::{
-    Certificate, CertificatePrivateKey, CertificatePrivateKeyAlgorithm,
-    CertificatePrivateKeyEncoding, CertificatePrivateKeyRotationPolicy, CertificateSpec,
+use mz_cloud_resources::crd::{
+    ManagedResource, MaterializeCertSpec,
+    generated::cert_manager::certificates::{
+        Certificate, CertificatePrivateKey, CertificatePrivateKeyAlgorithm,
+        CertificatePrivateKeyEncoding, CertificatePrivateKeyRotationPolicy, CertificateSpec,
+    },
 };
-use mz_cloud_resources::crd::materialize::v1alpha1::{Materialize, MaterializeCertSpec};
 
 pub fn create_certificate(
     default_spec: Option<MaterializeCertSpec>,
-    mz: &Materialize,
+    resource: &impl ManagedResource,
     mz_cert_spec: Option<MaterializeCertSpec>,
     cert_name: String,
     secret_name: String,
@@ -37,7 +39,7 @@ pub fn create_certificate(
             .labels
             .unwrap_or_default()
             .into_iter()
-            .chain(mz.default_labels())
+            .chain(resource.default_labels())
             .collect(),
     );
     let mut dns_names = mz_cert_spec
@@ -48,7 +50,7 @@ pub fn create_certificate(
         dns_names.extend(names);
     }
     Some(Certificate {
-        metadata: mz.managed_resource_meta(cert_name),
+        metadata: resource.managed_resource_meta(cert_name),
         spec: CertificateSpec {
             dns_names: Some(dns_names),
             duration: mz_cert_spec.duration.or(default_spec.duration),
